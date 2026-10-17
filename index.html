@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>WP-Monitor</title>
+  <meta name="description" content="Effizienz und Wirtschaftlichkeit der Wärmepumpe aus monatlichen Zählerständen.">
+  <meta name="theme-color" content="#0b6bcb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="WP-Monitor">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/config.js"></script>
+  <script src="js/calc.js"></script>
+  <script src="js/defaults.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="vendor/chart.umd.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="title"><h1>WP-Monitor</h1><span id="cloud-badge" class="badge" hidden></span></div>
+    <nav>
+      <button data-tab="entry" class="active">Erfassen</button>
+      <button data-tab="dash">Auswertung</button>
+      <button data-tab="master">Stammdaten</button>
+      <button data-tab="backup">Sicherung</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="entry" class="tab active">
+      <form id="entry-form" autocomplete="off">
+        <label>Zeitpunkt <input type="datetime-local" name="ts" required></label>
+        <div id="meter-fields"></div>
+        <label>Notiz <textarea name="note" rows="2"></textarea></label>
+        <div id="entry-issues" class="issues"></div>
+        <button type="submit" class="primary">Speichern</button>
+      </form>
+      <h2>Letzte Ablesungen</h2>
+      <div id="recent" class="table-wrap"></div>
+    </section>
+
+    <section id="dash" class="tab">
+      <div id="kpis" class="kpis"></div>
+      <div id="warnings" class="issues"></div>
+      <h2>Monate</h2>
+      <div class="chart"><canvas id="chart-months"></canvas></div>
+      <div id="months" class="table-wrap"></div>
+      <h2>Amortisation</h2>
+      <div class="chart"><canvas id="chart-amort"></canvas></div>
+      <div id="amort"></div>
+      <h2>Sensitivität</h2>
+      <div id="sens" class="table-wrap"></div>
+    </section>
+
+    <section id="master" class="tab">
+      <label>Tabelle
+        <select id="master-table">
+          <option value="config">Annahmen (Konfiguration)</option>
+          <option value="tariff">Tarife</option>
+          <option value="relief">§ 14a</option>
+          <option value="investment">Investitionen</option>
+          <option value="degree_day">Gradtagzahlen</option>
+          <option value="baseline">Baseline (Gas-Ära)</option>
+          <option value="event">Ereignisse</option>
+        </select>
+      </label>
+      <div id="gtz-import" hidden>
+        <h3>Gradtagzahlen nachtragen</h3>
+        <p class="hint">Eine Zeile je Monat: <code>2026-10;245,3</code>. Optional mit Station, langjährigem Mittel und Quelle:
+          <code>2026-10;Mannheim;245,3;228,5;wetterkontor.de</code></p>
+        <textarea id="gtz-csv" rows="3" placeholder="2026-10;245,3"></textarea>
+        <button id="gtz-btn" type="button">Übernehmen</button>
+      </div>
+      <div id="master-body" class="table-wrap"></div>
+    </section>
+
+    <section id="backup" class="tab">
+      <h2>Cloud-Sicherung</h2>
+      <div id="cloud-box"></div>
+      <h2>Datei</h2>
+      <p class="hint">Sicherung als JSON-Datei (z. B. in iCloud Drive). Import führt zusammen: Je Datensatz gewinnt die neuere
+        Änderung, gelöscht wird nichts. Auch deine Startdaten-Datei wird hier importiert.</p>
+      <div class="buttons">
+        <button id="export-btn" type="button">Sicherung exportieren</button>
+        <label class="button">Datei importieren <input id="import-file" type="file" accept="application/json,.json" hidden></label>
+      </div>
+      <div id="backup-msg" class="issues"></div>
+      <h2>Tabellen als CSV</h2>
+      <div id="csv-links" class="buttons"></div>
+    </section>
+  </main>
+</body>
+</html>

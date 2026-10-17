@@ -1,0 +1,7 @@
+__pycache__/
+*.sqlite
+*.bundle
+node_modules/
+# persönliche Daten nie einchecken
+*startdaten*.json
+wp-monitor-*.json
