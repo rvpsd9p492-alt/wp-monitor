@@ -60,23 +60,34 @@
           "decimals": 0
       },
       {
+          // Die Bosch-Regelung zeigt keine kWh für den Zuheizer, nur den Prozentanteil im Energie-Monitoring.
+          // Zähler bleibt für bereits erfasste Werte und für Regelungen, die kWh anzeigen; nicht im Formular.
           "id": "hp_el_backup",
           "name": "Energie Heizstab / Zuheizer (Bosch)",
           "unit": "kWh",
           "source": "controller",
-          "decimals": 0
+          "decimals": 0,
+          "hidden": true
+      },
+      {
+          "id": "hp_backup_pct",
+          "name": "Zuheizer-Anteil (Bosch Energie-Monitoring)",
+          "unit": "%",
+          "source": "controller",
+          "decimals": 0,
+          "kind": "gauge"
       },
       {
           "id": "hp_compressor_hours",
-          "name": "Verdichter-Betriebsstunden",
+          "name": "Betriebsstunden Kompressor (Verdichter), gesamt",
           "unit": "h",
           "source": "controller",
           "decimals": 0
       },
       {
           "id": "hp_compressor_starts",
-          "name": "Verdichter-Starts",
-          "unit": "count",
+          "name": "Kompressorstarts (Verdichterstarts), gesamt",
+          "unit": "Starts",
           "source": "controller",
           "decimals": 0
       },

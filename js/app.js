@@ -24,7 +24,7 @@ document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click
 window.addEventListener("wp:synced", () => { if (currentTab !== "entry") TABS[currentTab](); else loadRecent(); });
 
 // ------------------------------------------------------------------ Erfassen
-const meters = DEF.METERS.filter((m) => !m.historyOnly);
+const meters = DEF.METERS.filter((m) => !m.historyOnly && !m.hidden);
 const meterName = Object.fromEntries(DEF.METERS.map((m) => [m.id, m.name]));
 
 function lastReadings() {
@@ -41,7 +41,7 @@ function loadEntry() {
       <div class="row">
         <input type="text" inputmode="decimal" name="${m.id}" placeholder="${last[m.id] ? nf(last[m.id].value, m.decimals) : ""}">
         <span class="unit">${esc(m.unit)}</span>
-        <label class="reset"><input type="checkbox" name="reset_${m.id}"> Reset</label>
+        ${m.kind === "gauge" ? '<span class="reset hint">Anzeige</span>' : `<label class="reset"><input type="checkbox" name="reset_${m.id}"> Reset</label>`}
       </div>
       <div class="delta">${last[m.id] ? `zuletzt ${nf(last[m.id].value, m.decimals)} am ${fmtTs(last[m.id].t)}` : "noch keine Ablesung"}</div>
     </div>`).join("");
@@ -55,7 +55,7 @@ function collect() {
   meters.forEach((m) => {
     const v = num(form[m.id].value);
     if (v !== null) values[m.id] = v;
-    if (form["reset_" + m.id].checked) resets.push(m.id);
+    if (form["reset_" + m.id] && form["reset_" + m.id].checked) resets.push(m.id);
   });
   return { t: C.parseTs(form.ts.value), values, resets, note: form.note.value.trim() || null };
 }
@@ -116,7 +116,8 @@ function loadDashboard() {
       sy && { waerme_kwh: Math.round(sy.heat), az: sy.az, kosten_wp: Math.round(sy.costHp), kosten_gas: Math.round(sy.costGas) }),
     kpi("Amortisation vs. Gaskessel", am && am.vsGasYears ? nf(am.vsGasYears, 1) + " J." : "–", `Investitionsdelta ${eur(d.investment.delta)}`, d.investment),
     kpi("Amortisation Vollinvestition", am && am.fullYears ? nf(am.fullYears, 1) + " J." : "–", `Eigenanteil ${eur(d.investment.hpOwnShare)}`),
-    kpi("Heizstab-Anteil", pct(k.backupShare.value), k.backupShare.backupKwh == null ? "nicht verfügbar" : ""),
+    kpi("Heizstab-Anteil am WP-Strom", pct(k.backupShare.value), k.backupShare.source || "nicht verfügbar",
+      k.backupShare.backupKwh != null && { heizstab_kwh: Math.round(k.backupShare.backupKwh * 10) / 10, anzeige_prozent: k.backupShare.pct }),
     kpi("Haushaltsstrom", nf(k.householdDay.value, 1) + " kWh/Tag", "Hauszähler − WP-Zähler"),
   ].join("");
   renderMonths(d.months);
@@ -133,7 +134,7 @@ function renderMonths(months) {
     ["AZ", (m) => (m.az == null ? `<span title="${esc(m.azNote || "")}">–</span>` : nf(m.az, 2))],
     ["AZ Heizen", (m) => nf(m.azHeating, 2)],
     ["AZ WW", (m) => nf(m.azDhw, 2)],
-    ["Heizstab", (m) => pct(m.backupShare)],
+    ["Heizstab", (m) => (m.backupShare != null ? pct(m.backupShare) : m.backupPct != null ? nf(m.backupPct, 0) + " % Anz." : "–")],
     ["Haushalt/Tag", (m) => nf(m.householdDay, 1)],
     ["Heizen erwartet", (m) => nf(m.heatingExpected, 0)],
     ["Kosten WP", (m) => eur(m.economics && m.economics.costHp)],

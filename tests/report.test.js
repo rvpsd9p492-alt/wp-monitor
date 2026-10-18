@@ -99,3 +99,18 @@ test("Gradtagzahlen: G20/15-Probe in Wintermonaten", () => {
   near(feb24, 29 * (20 - 8.7), 1);
   assert.ok(!D.GTZ_MANNHEIM.some((x) => x[0] === "2026-10"), "laufender Monat darf nicht enthalten sein");
 });
+
+test("Zuheizer-Anteil in %: Momentanwert, Schätzung des Heizstab-Stroms", () => {
+  const data = sample();
+  data.readings.push({ meter: "house_el", ts: "2026-11-16T10:00", value: 1480 },
+    { meter: "hp_el", ts: "2026-11-16T10:00", value: 320 }, { meter: "hp_heat_total", ts: "2026-11-16T10:00", value: 1150 },
+    { meter: "hp_backup_pct", ts: "2026-11-16T10:00", value: 2 });
+  const d = R.build(data, cfg, ts("2026-11-16T12:00"));
+  near(d.kpis.backupShare.backupKwh, 0.02 * 1150, 1e-9);
+  near(d.kpis.backupShare.value, 0.02 * 1150 / 320, 1e-9); // 7,2 % des WP-Stroms → über der Warnschwelle 5 %
+  assert.ok(d.warnings.some((w) => w.code === "backup"));
+  assert.equal(d.months[1].backupPct, 2);
+  // Momentanwert darf sinken, aber nicht über 100 %
+  assert.ok(!R.validate(data, METERS, cfg, ts("2026-12-01T10:00"), { hp_backup_pct: 1 }, []).issues.some((i) => i.level === "error"));
+  assert.ok(R.validate(data, METERS, cfg, ts("2026-12-01T10:00"), { hp_backup_pct: 120 }, []).issues.some((i) => i.code === "range"));
+});

@@ -1,7 +1,7 @@
 // Offline-Cache: alles wird beim ersten Besuch geladen; danach kommt die App aus dem Cache
 // und aktualisiert sich im Hintergrund, sobald Netz da ist (beim nächsten Start aktiv).
 // Bei jeder Änderung an den Dateien CACHE hochzählen, damit Geräte die neue Version vollständig laden.
-const CACHE = "wp-monitor-v1";
+const CACHE = "wp-monitor-v2";
 const ASSETS = [
   "./",
   "css/style.css",

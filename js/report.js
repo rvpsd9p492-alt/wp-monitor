@@ -20,6 +20,11 @@
     Object.keys(by).forEach((m) => { out[m] = C.intervals(by[m]); });
     return out;
   }
+  /** Letzter Momentanwert (z. B. Prozentanzeige) im Fenster (t0, t1]. */
+  function latestGauge(rs, t0, t1) {
+    const inside = (rs || []).filter((r) => r.t > t0 && r.t <= t1);
+    return inside.length ? inside.reduce((a, b) => (b.t > a.t ? b : a)) : null;
+  }
   const get = (s, m, t0, t1) => (s[m] && s[m].length ? C.consumption(s[m], t0, t1) : null);
   const val = (sh) => (!sh || sh.hours === 0 ? null : sh.value);
 
@@ -96,7 +101,7 @@
   /* ---------- Dashboard ---------- */
   function build(data, cfg, now) {
     const a = { eta: cfg.boiler_efficiency_hs, gasOther: +cfg.gas_other_costs_eur_year || 0, hpOther: +cfg.hp_other_costs_eur_year || 0 };
-    const s = series(data);
+    const s = series(data), byMeter = readingsByMeter(data);
     const elT = tariffs(data, "electricity"), gasT = tariffs(data, "gas");
     const reliefs = data.reliefs;
     const base = baselineModel(data, cfg);
@@ -167,6 +172,8 @@
       row.azHeating = longEnough ? C.ratio(g.hp_heat_heating, g.hp_el_heating) : null;
       row.azDhw = longEnough ? C.ratio(g.hp_heat_dhw, g.hp_el_dhw) : null;
       row.backupShare = C.ratio(g.hp_el_backup, hp.value);
+      const pctM = latestGauge(byMeter.hp_backup_pct, t0 - 1, t1);
+      row.backupPct = pctM ? pctM.value : null;
       row.cycling = C.cycling(g.hp_compressor_starts, g.hp_compressor_hours);
       if (row.backupShare != null && row.backupShare > cfg.backup_warn_share)
         warn("warning", "backup", `${mon}: Heizstab-Anteil ${(row.backupShare * 100).toFixed(1)} %.`, mon);
@@ -194,6 +201,14 @@
       if (w && C.hours(w[0], w[1]) / 24 >= 364) jaz = C.ratio(heatIn(s, w[0], w[1]).heat, C.consumption(s.hp_el, w[0], w[1]).value);
     }
     const backupC = val(get(s, "hp_el_backup", start, end));
+    // Bosch zeigt den Zuheizer nur als Prozentanteil im Energie-Monitoring. Annahme: Anteil an der erzeugten Wärme
+    // seit Inbetriebnahme; ein Heizstab wandelt Strom 1:1 in Wärme, also Heizstab-Strom ≈ Anteil × Wärme.
+    const pctNow = latestGauge(byMeter.hp_backup_pct, start - 1, Math.max(end, now));
+    let backup = { kwh: backupC, source: backupC != null ? "kWh der Regelung" : null, hpEl: null };
+    if (backupC == null && pctNow && win) {
+      backup = { kwh: pctNow.value / 100 * heatIn(s, win[0], win[1]).heat, hpEl: C.consumption(s.hp_el, win[0], win[1]).value,
+        source: `geschätzt: Zuheizer-Anteil ${pctNow.value} % × Wärme`, pct: pctNow.value };
+    }
     const hpTotal = C.consumption(s.hp_el, start, end).value;
     const houseTotal = get(s, "house_el", start, end);
     const householdDay = houseTotal && houseTotal.hours ? C.ratio(houseTotal.value - hpTotal, houseTotal.days) : null;
@@ -241,6 +256,9 @@
     if (prevMonth >= C.monthKey(start) && !base.gtzMonth[prevMonth])
       warn("info", "gtz_missing", `Gradtagzahl für ${prevMonth} fehlt (Stammdaten → Gradtagzahlen).`);
     checkAz(azSince, end, null);
+    const backupShare = C.ratio(backup.kwh, backup.hpEl != null ? backup.hpEl : hpTotal);
+    if (backupShare != null && backupShare > cfg.backup_warn_share)
+      warn("warning", "backup", `Heizstab-Anteil am WP-Strom ${(backupShare * 100).toFixed(1)} % (${backup.source}).`);
 
     return {
       empty: false,
@@ -250,7 +268,7 @@
           sinceStart: azSince, jaz, window: win, note: HEAT_NOTE },
         savingsSinceStart: { value: savingsTotal, estimated: savingsEstimated },
         savingsPerYear: annual,
-        backupShare: { value: C.ratio(backupC, hpTotal), backupKwh: backupC, hpEl: hpTotal },
+        backupShare: { value: backupShare, backupKwh: backup.kwh, source: backup.source, pct: backup.pct != null ? backup.pct : null },
         householdDay: { value: householdDay },
         breakEvenAz: { value: beAz, inputs: { ctEl: elNow && elNow.ct, ctGas: gasNow && gasNow.ct, eta: a.eta } },
       },
@@ -284,6 +302,11 @@
       if (!isFinite(value)) { issues.push({ level: "error", code: "nan", meter: mid, message: `${m.name}: keine Zahl.` }); return; }
       const { prev, next, same } = neighbours(by[mid] || [], t), reset = resetSet.has(mid);
       if (same) { issues.push({ level: "error", code: "duplicate", meter: mid, message: `${m.name}: Zu diesem Zeitpunkt gibt es schon eine Ablesung.` }); return; }
+      if (m.kind === "gauge") { // Momentanwert: kein Zählerstand, darf auch sinken
+        if (m.unit === "%" && (value < 0 || value > 100))
+          issues.push({ level: "error", code: "range", meter: mid, message: `${m.name}: Prozentwert muss zwischen 0 und 100 liegen.` });
+        return;
+      }
       if (value < 0) issues.push({ level: "error", code: "negative", meter: mid, message: `${m.name}: negativer Zählerstand.` });
       if (prev && !reset) {
         if (value < prev.value - 1e-9)
