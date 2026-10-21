@@ -38,6 +38,17 @@
     if (a != null || b != null) return (a || 0) + (b || 0);
     return total != null ? total : null;
   }
+  /** Taktung im Fenster: Heizung, Warmwasser und gesamt (Summe der getrennten Werte, sonst Gesamtzähler). */
+  function cyclingIn(s, t0, t1) {
+    const v = (m) => val(get(s, m, t0, t1));
+    const sh = v("hp_compressor_starts_heating"), hh = v("hp_compressor_hours_heating");
+    const sw = v("hp_compressor_starts_dhw"), hw = v("hp_compressor_hours_dhw");
+    const split = sh != null && hh != null && sw != null && hw != null;
+    return {
+      heating: C.cycling(sh, hh), dhw: C.cycling(sw, hw),
+      total: split ? C.cycling(sh + sw, hh + hw) : C.cycling(v("hp_compressor_starts"), v("hp_compressor_hours")),
+    };
+  }
   const get = (s, m, t0, t1) => (s[m] && s[m].length ? C.consumption(s[m], t0, t1) : null);
   const val = (sh) => (!sh || sh.hours === 0 ? null : sh.value);
 
@@ -151,8 +162,7 @@
       const hp = get(s, "hp_el", t0, t1), house = get(s, "house_el", t0, t1);
       let { heat, source: heatSrc } = heatIn(s, t0, t1);
       const g = {};
-      ["hp_heat_heating", "hp_heat_dhw", "hp_el_heating", "hp_el_dhw", "hp_el_backup", "hp_compressor_hours",
-        "hp_compressor_starts", "hp_el_ctrl_total"].forEach((k) => { g[k] = val(get(s, k, t0, t1)); });
+      ["hp_heat_heating", "hp_heat_dhw", "hp_el_heating", "hp_el_dhw", "hp_el_backup", "hp_el_ctrl_total"].forEach((k) => { g[k] = val(get(s, k, t0, t1)); });
       const days = hp.days;
       const row = { month: mon, days, interpolated: !!((hp && hp.interpolated) || (house && house.interpolated)),
         partialMonth: t1 - t0 < m1 - m0, hpEl: hp.value, houseEl: val(house),
@@ -190,11 +200,14 @@
       row.backupShare = C.ratio(row.backup, hp.value);
       const pctM = latestGauge(byMeter.hp_backup_pct, t0 - 1, t1);
       row.backupPct = pctM ? pctM.value : null;
-      row.cycling = C.cycling(g.hp_compressor_starts, g.hp_compressor_hours);
+      const cyc = cyclingIn(s, t0, t1);
+      row.cycling = cyc.total; row.cyclingHeating = cyc.heating; row.cyclingDhw = cyc.dhw;
       if (row.backupShare != null && row.backupShare > cfg.backup_warn_share)
         warn("warning", "backup", `${mon}: Heizstab-Anteil ${(row.backupShare * 100).toFixed(1)} %.`, mon);
-      if (row.cycling && row.cycling.avgRuntimeMin < cfg.min_runtime_warn_min)
-        warn("warning", "cycling", `${mon}: mittlere Laufzeit ${row.cycling.avgRuntimeMin.toFixed(0)} min pro Start.`, mon);
+      // Takten ist im Heizbetrieb das Problem; lange Warmwasser-Läufe würden den Gesamtwert schönen
+      const cw = row.cyclingHeating || row.cycling;
+      if (cw && cw.avgRuntimeMin < cfg.min_runtime_warn_min)
+        warn("warning", "cycling", `${mon}: mittlere Laufzeit ${cw.avgRuntimeMin.toFixed(0)} min pro Start${row.cyclingHeating ? " (Heizung)" : ""}.`, mon);
       checkAz(row.az, t1, mon);
 
       if (heat != null && elT.length && gasT.length) {
@@ -287,6 +300,7 @@
         savingsPerYear: annual,
         backupShare: { value: backupShare, backupKwh: backup.kwh, source: backup.source, pct: backup.pct != null ? backup.pct : null },
         householdDay: { value: householdDay },
+        cycling: cyclingIn(s, start, end),
         breakEvenAz: { value: beAz, inputs: { ctEl: elNow && elNow.ct, ctGas: gasNow && gasNow.ct, eta: a.eta } },
       },
       months, investment: invest, amortization: amort, sensitivity: sens,

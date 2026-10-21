@@ -31,7 +31,9 @@ Wie der WP-Monitor rechnet. Umsetzung in `js/calc.js` (Formeln) und `js/report.j
 - Zähler der Regelung stehen bei Inbetriebnahme auf 0 (`controller_counters_start_zero`): Ein neu erfasster Wert ohne
   eigenen Startwert zählt ab `commissioning_ts`.
 - **JAZ** gleitend über 12 Monate, erst ab 12 Monaten Daten; vorher „AZ seit Inbetriebnahme“.
-- **Taktung**: Starts/Betriebsstunde und mittlere Laufzeit je Start; Warnung unter `min_runtime_warn_min`.
+- **Taktung**: Starts/Betriebsstunde und mittlere Laufzeit je Start, getrennt nach Heizung und Warmwasser (Gesamt =
+  Summe). Die Warnung unter `min_runtime_warn_min` bezieht sich auf den Heizbetrieb, weil lange Warmwasser-Läufe den
+  Gesamtwert schönen; ohne getrennte Werte auf den Gesamtwert.
 
 ## Kontrafaktisches Gas-Szenario
 

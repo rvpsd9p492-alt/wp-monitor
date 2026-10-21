@@ -119,6 +119,10 @@ function loadDashboard() {
     kpi("Heizstab-Anteil am WP-Strom", pct(k.backupShare.value), k.backupShare.source || "nicht verfügbar",
       k.backupShare.backupKwh != null && { heizstab_kwh: Math.round(k.backupShare.backupKwh * 10) / 10, anzeige_prozent: k.backupShare.pct }),
     kpi("Haushaltsstrom", nf(k.householdDay.value, 1) + " kWh/Tag", "Hauszähler − WP-Zähler"),
+    kpi("Laufzeit je Kompressorstart (Heizung)", k.cycling.heating ? nf(k.cycling.heating.avgRuntimeMin, 0) + " min" : "–",
+      k.cycling.heating ? `${nf(k.cycling.heating.startsPerHour, 1)} Starts je Betriebsstunde` : "Starts/Stunden Heizung nicht erfasst",
+      (k.cycling.heating || k.cycling.total) && { heizung_min: k.cycling.heating && Math.round(k.cycling.heating.avgRuntimeMin),
+        warmwasser_min: k.cycling.dhw && Math.round(k.cycling.dhw.avgRuntimeMin), gesamt_min: k.cycling.total && Math.round(k.cycling.total.avgRuntimeMin) }),
   ].join("");
   renderMonths(d.months);
   renderAmort(d);
@@ -136,6 +140,8 @@ function renderMonths(months) {
     ["AZ WW", (m) => nf(m.azDhw, 2)],
     ["Heizstab", (m) => (m.backupShare != null ? pct(m.backupShare) : m.backupPct != null ? nf(m.backupPct, 0) + " % Anz." : "–")],
     ["Haushalt/Tag", (m) => nf(m.householdDay, 1)],
+    ["min/Start Heizen", (m) => (m.cyclingHeating ? nf(m.cyclingHeating.avgRuntimeMin, 0) : "–")],
+    ["min/Start WW", (m) => (m.cyclingDhw ? nf(m.cyclingDhw.avgRuntimeMin, 0) : "–")],
     ["Heizen erwartet", (m) => nf(m.heatingExpected, 0)],
     ["Kosten WP", (m) => eur(m.economics && m.economics.costHp)],
     ["Kosten Gas", (m) => eur(m.economics && m.economics.costGas)],

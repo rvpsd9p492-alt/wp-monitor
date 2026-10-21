@@ -129,3 +129,20 @@ test("Zuheizer in kWh getrennt nach Heizung/Warmwasser; Regelungszähler starten
   const off = R.build(data, Object.assign({}, cfg, { controller_counters_start_zero: false }), ts("2026-11-16T12:00"));
   assert.match(off.kpis.backupShare.source, /geschätzt/); // ohne Startwert 0 kein Intervall → Ersatz über Prozent
 });
+
+test("Taktung getrennt nach Heizung und Warmwasser", () => {
+  const data = sample();
+  const at = "2026-10-21T07:19";
+  [["hp_compressor_starts_heating", 58], ["hp_compressor_hours_heating", 29], ["hp_compressor_starts_dhw", 5], ["hp_compressor_hours_dhw", 6],
+    ["hp_el", 34.73], ["hp_heat_total", 104], ["house_el", 1062]].forEach(([meter, value]) => data.readings.push({ meter, ts: at, value }));
+  const d = R.build(data, cfg, ts("2026-10-21T08:00"));
+  near(d.kpis.cycling.heating.avgRuntimeMin, 29 / 58 * 60, 1e-9);
+  near(d.kpis.cycling.dhw.avgRuntimeMin, 72, 1e-9);
+  near(d.kpis.cycling.total.avgRuntimeMin, 35 / 63 * 60, 1e-9);
+  near(d.months[0].cyclingHeating.avgRuntimeMin, 30, 1e-9);
+  assert.ok(!d.warnings.some((w) => w.code === "cycling"));
+  // Heizung taktet: Warnung, obwohl der Gesamtwert durch Warmwasser über der Schwelle läge
+  data.readings.find((r) => r.meter === "hp_compressor_starts_heating" && r.ts === at).value = 120;
+  const w = R.build(data, cfg, ts("2026-10-21T08:00"));
+  assert.ok(w.warnings.some((x) => x.code === "cycling" && /Heizung/.test(x.text)));
+});

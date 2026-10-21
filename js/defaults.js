@@ -93,18 +93,49 @@
           "hidden": true
       },
       {
+          "id": "hp_compressor_starts_heating",
+          "name": "Kompressorstarts Heizung",
+          "unit": "Starts",
+          "source": "controller",
+          "decimals": 0
+      },
+      {
+          "id": "hp_compressor_hours_heating",
+          "name": "Betriebsstunden Kompressor Heizung",
+          "unit": "h",
+          "source": "controller",
+          "decimals": 0
+      },
+      {
+          "id": "hp_compressor_starts_dhw",
+          "name": "Kompressorstarts Warmwasser",
+          "unit": "Starts",
+          "source": "controller",
+          "decimals": 0
+      },
+      {
+          "id": "hp_compressor_hours_dhw",
+          "name": "Betriebsstunden Kompressor Warmwasser",
+          "unit": "h",
+          "source": "controller",
+          "decimals": 0
+      },
+      {
+          // Gesamtwerte: Summe aus Heizung + Warmwasser, daher nicht mehr im Formular; bleiben für alte Werte.
           "id": "hp_compressor_hours",
           "name": "Betriebsstunden Kompressor (Verdichter), gesamt",
           "unit": "h",
           "source": "controller",
-          "decimals": 0
+          "decimals": 0,
+          "hidden": true
       },
       {
           "id": "hp_compressor_starts",
           "name": "Kompressorstarts (Verdichterstarts), gesamt",
           "unit": "Starts",
           "source": "controller",
-          "decimals": 0
+          "decimals": 0,
+          "hidden": true
       },
       {
           "id": "gas_m3",
