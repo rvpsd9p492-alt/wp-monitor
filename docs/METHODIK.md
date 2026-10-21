@@ -24,10 +24,12 @@ Wie der WP-Monitor rechnet. Umsetzung in `js/calc.js` (Formeln) und `js/report.j
 - **AZ** = Wärme / Strom_WP (Strom vom geeichten Unterzähler, Wärme aus der Regelung:
   „Erzeugte Energie Total“, sonst Heizen + Warmwasser).
 - AZ Heizen / Warmwasser nur, wenn die Regelung den Strom je Betriebsart liefert.
-- **Heizstab-Anteil** = Heizstab-Energie / Strom_WP; Warnung über `backup_warn_share`. Die Bosch-Regelung zeigt keine
-  kWh für den Zuheizer, nur den **Zuheizer-Anteil in %** im Energie-Monitoring. Erfasst wird dieser Momentanwert
-  (kein Zählerstand). Annahme: Anteil an der erzeugten Wärme seit Inbetriebnahme; da ein Heizstab Strom 1:1 in Wärme
-  wandelt, gilt Heizstab-Strom ≈ Anteil × Wärme. Als „geschätzt“ gekennzeichnet.
+- **Heizstab-Anteil** = Zuheizer-Energie / Strom_WP; Warnung über `backup_warn_share`. Die Bosch-Regelung zeigt die
+  Zuheizer-Energie in kWh getrennt nach Heizung und Warmwasser (kein Gesamtwert); die App addiert beide. Ersatzweise,
+  wenn keine kWh erfasst sind: Zuheizer-Anteil in % aus dem Energie-Monitoring × erzeugte Wärme (als „geschätzt“
+  gekennzeichnet; ein Heizstab wandelt Strom 1:1 in Wärme).
+- Zähler der Regelung stehen bei Inbetriebnahme auf 0 (`controller_counters_start_zero`): Ein neu erfasster Wert ohne
+  eigenen Startwert zählt ab `commissioning_ts`.
 - **JAZ** gleitend über 12 Monate, erst ab 12 Monaten Daten; vorher „AZ seit Inbetriebnahme“.
 - **Taktung**: Starts/Betriebsstunde und mittlere Laufzeit je Start; Warnung unter `min_runtime_warn_min`.
 

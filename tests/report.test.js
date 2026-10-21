@@ -114,3 +114,18 @@ test("Zuheizer-Anteil in %: Momentanwert, Schätzung des Heizstab-Stroms", () =>
   assert.ok(!R.validate(data, METERS, cfg, ts("2026-12-01T10:00"), { hp_backup_pct: 1 }, []).issues.some((i) => i.level === "error"));
   assert.ok(R.validate(data, METERS, cfg, ts("2026-12-01T10:00"), { hp_backup_pct: 120 }, []).issues.some((i) => i.code === "range"));
 });
+
+test("Zuheizer in kWh getrennt nach Heizung/Warmwasser; Regelungszähler starten bei Inbetriebnahme bei 0", () => {
+  const data = sample();
+  data.readings.push({ meter: "house_el", ts: "2026-11-16T10:00", value: 1480 },
+    { meter: "hp_el", ts: "2026-11-16T10:00", value: 320 }, { meter: "hp_heat_total", ts: "2026-11-16T10:00", value: 1150 },
+    { meter: "hp_el_backup_heating", ts: "2026-11-16T10:00", value: 6 }, { meter: "hp_el_backup_dhw", ts: "2026-11-16T10:00", value: 4 },
+    { meter: "hp_backup_pct", ts: "2026-11-16T10:00", value: 50 }); // kWh haben Vorrang vor dem Prozentwert
+  const d = R.build(data, cfg, ts("2026-11-16T12:00"));
+  near(d.kpis.backupShare.backupKwh, 10, 1e-9);
+  near(d.kpis.backupShare.value, 10 / 320, 1e-9);
+  assert.equal(d.kpis.backupShare.source, "kWh der Regelung");
+  near(d.months[0].backup + d.months[1].backup, 10, 1e-9);
+  const off = R.build(data, Object.assign({}, cfg, { controller_counters_start_zero: false }), ts("2026-11-16T12:00"));
+  assert.match(off.kpis.backupShare.source, /geschätzt/); // ohne Startwert 0 kein Intervall → Ersatz über Prozent
+});

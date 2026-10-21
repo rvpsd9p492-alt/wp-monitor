@@ -3,6 +3,7 @@
 (function (root) {
   "use strict";
   const C = root.WPCalc || require("./calc.js");
+  const DEF = root.WPDefaults || require("./defaults.js");
   const HEAT_NOTE = "Wärme: Herstellerangabe der Bosch-Regelung, nicht geeicht, ganzzahlig abgeschnitten";
   // Hauszähler zeigt ganze kWh: Differenzen sind bis zu ±1 kWh ungenau.
   const HOUSE_RESOLUTION = 1.0;
@@ -15,8 +16,15 @@
     });
     return by;
   }
-  function series(data) {
+  /** Intervalle je Zähler. Zähler der Regelung beginnen bei Inbetriebnahme bei 0 (ANNAHME, abschaltbar), damit schon
+      die erste Ablesung eines neu erfassten Werts einen Zeitraum ergibt. */
+  function series(data, cfg) {
     const by = readingsByMeter(data), out = {};
+    const t0 = cfg && cfg.controller_counters_start_zero && cfg.commissioning_ts ? C.parseTs(cfg.commissioning_ts) : null;
+    if (t0 != null) DEF.METERS.forEach((m) => {
+      if (m.source !== "controller" || m.kind === "gauge" || !by[m.id]) return;
+      if (!by[m.id].some((r) => r.t <= t0 + C.H / 60)) by[m.id].push({ t: t0, value: 0, reset: true, implicit: true });
+    });
     Object.keys(by).forEach((m) => { out[m] = C.intervals(by[m]); });
     return out;
   }
@@ -24,6 +32,11 @@
   function latestGauge(rs, t0, t1) {
     const inside = (rs || []).filter((r) => r.t > t0 && r.t <= t1);
     return inside.length ? inside.reduce((a, b) => (b.t > a.t ? b : a)) : null;
+  }
+  /** Summe der getrennten Werte (Heizung + Warmwasser), sonst der Gesamtwert, sonst null. */
+  function sumKnown(a, b, total) {
+    if (a != null || b != null) return (a || 0) + (b || 0);
+    return total != null ? total : null;
   }
   const get = (s, m, t0, t1) => (s[m] && s[m].length ? C.consumption(s[m], t0, t1) : null);
   const val = (sh) => (!sh || sh.hours === 0 ? null : sh.value);
@@ -101,7 +114,7 @@
   /* ---------- Dashboard ---------- */
   function build(data, cfg, now) {
     const a = { eta: cfg.boiler_efficiency_hs, gasOther: +cfg.gas_other_costs_eur_year || 0, hpOther: +cfg.hp_other_costs_eur_year || 0 };
-    const s = series(data), byMeter = readingsByMeter(data);
+    const s = series(data, cfg), byMeter = readingsByMeter(data);
     const elT = tariffs(data, "electricity"), gasT = tariffs(data, "gas");
     const reliefs = data.reliefs;
     const base = baselineModel(data, cfg);
@@ -146,7 +159,7 @@
         household: house && house.hours > 0 ? house.value - hp.value : null,
         heat, heatSource: heatSrc, heatEstimated: false,
         heatHeating: g.hp_heat_heating, heatDhw: g.hp_heat_dhw, elHeating: g.hp_el_heating, elDhw: g.hp_el_dhw,
-        backup: g.hp_el_backup, ctrlEl: g.hp_el_ctrl_total };
+        ctrlEl: g.hp_el_ctrl_total };
       row.householdDay = C.ratio(row.household, days);
 
       const gtz = base.gtzMonth[mon];
@@ -171,7 +184,10 @@
       row.azNote = longEnough ? null : `Intervall < ${cfg.min_az_interval_days} Tage`;
       row.azHeating = longEnough ? C.ratio(g.hp_heat_heating, g.hp_el_heating) : null;
       row.azDhw = longEnough ? C.ratio(g.hp_heat_dhw, g.hp_el_dhw) : null;
-      row.backupShare = C.ratio(g.hp_el_backup, hp.value);
+      row.backupHeating = val(get(s, "hp_el_backup_heating", t0, t1));
+      row.backupDhw = val(get(s, "hp_el_backup_dhw", t0, t1));
+      row.backup = sumKnown(row.backupHeating, row.backupDhw, g.hp_el_backup);
+      row.backupShare = C.ratio(row.backup, hp.value);
       const pctM = latestGauge(byMeter.hp_backup_pct, t0 - 1, t1);
       row.backupPct = pctM ? pctM.value : null;
       row.cycling = C.cycling(g.hp_compressor_starts, g.hp_compressor_hours);
@@ -200,7 +216,8 @@
       const w = commonWindow(s, ["hp_el", ...hm], end - 365 * C.DAY, end);
       if (w && C.hours(w[0], w[1]) / 24 >= 364) jaz = C.ratio(heatIn(s, w[0], w[1]).heat, C.consumption(s.hp_el, w[0], w[1]).value);
     }
-    const backupC = val(get(s, "hp_el_backup", start, end));
+    const backupC = sumKnown(val(get(s, "hp_el_backup_heating", start, end)), val(get(s, "hp_el_backup_dhw", start, end)),
+      val(get(s, "hp_el_backup", start, end)));
     // Bosch zeigt den Zuheizer nur als Prozentanteil im Energie-Monitoring. Annahme: Anteil an der erzeugten Wärme
     // seit Inbetriebnahme; ein Heizstab wandelt Strom 1:1 in Wärme, also Heizstab-Strom ≈ Anteil × Wärme.
     const pctNow = latestGauge(byMeter.hp_backup_pct, start - 1, Math.max(end, now));

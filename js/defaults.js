@@ -60,8 +60,7 @@
           "decimals": 0
       },
       {
-          // Die Bosch-Regelung zeigt keine kWh für den Zuheizer, nur den Prozentanteil im Energie-Monitoring.
-          // Zähler bleibt für bereits erfasste Werte und für Regelungen, die kWh anzeigen; nicht im Formular.
+          // Gesamtwert gibt es an der Bosch-Regelung nicht (nur Heizung/Warmwasser getrennt); bleibt für alte Werte.
           "id": "hp_el_backup",
           "name": "Energie Heizstab / Zuheizer (Bosch)",
           "unit": "kWh",
@@ -70,12 +69,28 @@
           "hidden": true
       },
       {
+          "id": "hp_el_backup_heating",
+          "name": "Zuheizer Heizung (Bosch)",
+          "unit": "kWh",
+          "source": "controller",
+          "decimals": 0
+      },
+      {
+          "id": "hp_el_backup_dhw",
+          "name": "Zuheizer Warmwasser (Bosch)",
+          "unit": "kWh",
+          "source": "controller",
+          "decimals": 0
+      },
+      {
+          // Ersatz, solange keine kWh erfasst sind: Prozentanteil im Energie-Monitoring (nicht mehr im Formular).
           "id": "hp_backup_pct",
           "name": "Zuheizer-Anteil (Bosch Energie-Monitoring)",
           "unit": "%",
           "source": "controller",
           "decimals": 0,
-          "kind": "gauge"
+          "kind": "gauge",
+          "hidden": true
       },
       {
           "id": "hp_compressor_hours",
@@ -112,6 +127,7 @@
   // [Schlüssel, Default, Status, Bedeutung]
   const CONFIG = [
     ["commissioning_ts", null, "FEST", "Inbetriebnahme (ISO-Zeitpunkt). Leer = erste Ablesung des WP-Zählers"],
+    ["controller_counters_start_zero", true, "ANNAHME", "Zähler der Bosch-Regelung standen bei Inbetriebnahme auf 0"],
     ["boiler_efficiency_hs", 0.90, "ANNAHME", "Jahresnutzungsgrad Altkessel bezogen auf Hs"],
     ["gas_factor_kwh_m3", 11.06, "FEST", "Zustandszahl × Brennwert laut Gasrechnung"],
     ["gas_other_costs_eur_year", 0, "OFFEN", "Schornsteinfeger + Kesselwartung, die wegfallen"],
