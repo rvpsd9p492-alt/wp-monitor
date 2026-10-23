@@ -85,7 +85,7 @@ function check(doSave) {
 function loadRecent() {
   const rs = WP.data().readings.slice().sort((a, b) => C.parseTs(b.ts) - C.parseTs(a.ts)).slice(0, 40);
   $("#recent").innerHTML = rs.length ? `<table><tr><th>Zeit</th><th>Zähler</th><th>Wert</th><th></th></tr>${rs.map((r) => `
-    <tr><td>${fmtTs(C.parseTs(r.ts))}</td><td class="text">${esc(meterName[r.meter] || r.meter)}${r.reset ? " (Reset)" : ""}</td>
+    <tr><td>${fmtTs(C.parseTs(r.ts))}</td><td class="text">${esc(meterName[r.meter] || r.meter)}${r.reset ? " (Reset)" : ""}${r.source === "ha" ? ' <span class="hint">HA</span>' : ""}</td>
     <td>${nf(r.value, 2)}</td><td><button class="icon" data-del="${esc(r.id)}" aria-label="Löschen">✕</button></td></tr>`).join("")}</table>`
     : '<p class="hint">Noch keine Ablesungen. Startdaten unter „Sicherung“ importieren.</p>';
   $("#recent").onclick = (e) => {
@@ -262,6 +262,7 @@ $("#gtz-btn").addEventListener("click", () => {
 // ------------------------------------------------------------------ Sicherung
 function loadBackup() {
   renderCloud(WP.cloud.status());
+  renderHa();
   const kinds = Object.keys(WP.KINDS);
   $("#csv-links").innerHTML = kinds.map((k) => `<button type="button" data-csv="${k}">${k}</button>`).join("");
 }
@@ -293,6 +294,36 @@ function renderCloud(s) {
   $("#sync-btn").onclick = () => WP.cloud.sync({ force: true });
   $("#logout-btn").onclick = () => { if (confirm("Abmelden? Die Daten bleiben auf diesem Gerät.")) WP.cloud.signOut(); };
 }
+// Home Assistant: geheimer Schlüssel und fertiger Konfigurationsblock (siehe docs/HOME-ASSISTANT.md)
+let haLoggedIn = null;
+async function renderHa(opts) {
+  const box = $("#ha-box"), s = WP.cloud.status();
+  haLoggedIn = s.loggedIn;
+  if (!s.loggedIn) { box.innerHTML = '<p class="hint">Erst bei der Cloud-Sicherung anmelden.</p>'; return; }
+  box.innerHTML = '<p class="hint">Lade …</p>';
+  let k;
+  try { k = await WP.cloud.ingestKey(opts); }
+  catch (e) { box.innerHTML = `<div class="issues"><div class="error">${esc(e.message)}</div></div>`; return; }
+  if (!k) {
+    box.innerHTML = `<p class="hint">Home Assistant kann Zählerstände der Regelung automatisch übertragen. Dafür braucht es einen
+      geheimen Schlüssel; er darf nur Ablesungen anlegen.</p><button type="button" id="ha-create">Schlüssel erzeugen</button>`;
+    $("#ha-create").onclick = () => renderHa({ create: true });
+    return;
+  }
+  box.innerHTML = `<p class="hint">In Home Assistant in <code>secrets.yaml</code> eintragen. Wie ein Passwort behandeln.</p>
+    <label>wp_monitor_token <input id="ha-token" readonly value="${esc(k.token)}"></label>
+    <label>wp_monitor_apikey <input id="ha-apikey" readonly value="${esc(k.apikey)}"></label>
+    <div class="buttons"><button type="button" id="ha-copy">Als secrets.yaml kopieren</button>
+      <button type="button" id="ha-renew">Neuen Schlüssel erzeugen</button></div>
+    <p class="hint">Adresse: <code>${esc(k.url)}</code>. Anleitung: docs/HOME-ASSISTANT.md im Repository.</p>`;
+  $("#ha-copy").onclick = async () => {
+    const text = `wp_monitor_token: "${k.token}"\nwp_monitor_apikey: "${k.apikey}"\n`;
+    try { await navigator.clipboard.writeText(text); $("#ha-copy").textContent = "Kopiert"; }
+    catch (e) { $("#ha-token").select(); }
+  };
+  $("#ha-renew").onclick = () => { if (confirm("Neuen Schlüssel erzeugen? Der alte funktioniert dann nicht mehr.")) renderHa({ renew: true, create: true }); };
+}
+WP.cloud.onStatus((s) => { if (currentTab === "backup" && s.loggedIn !== haLoggedIn) renderHa(); });
 WP.cloud.onStatus(renderCloud);
 renderCloud(WP.cloud.status());
 

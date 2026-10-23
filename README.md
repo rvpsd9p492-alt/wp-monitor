@@ -37,6 +37,12 @@ Gleiches Supabase-Projekt und gleiches Konto wie die Leichtathletik-App, eigene 
 URL und Publishable Key in `js/config.js`. Abgleich je Datensatz, neuere Änderung gewinnt (auch serverseitig per
 Trigger), Löschungen werden übertragen, Offline-Änderungen beim nächsten Online-Start nachgeholt.
 
+## Home Assistant
+
+Zählerstände der Bosch-Regelung (über die lokale API des K 40 RF) kann Home Assistant täglich automatisch übertragen:
+Schlüssel in der App unter *Sicherung → Home Assistant*, Konfiguration in [docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md)
+(Supabase-Funktion `wp_ingest`, Migration `supabase/migrations/20261023100000_wp_ingest.sql`).
+
 ## Entwicklung
 
 - Rechenlogik ohne Oberfläche: `js/calc.js`, `js/report.js`; Tests: `node --test tests/*.test.js`

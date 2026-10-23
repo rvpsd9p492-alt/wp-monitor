@@ -205,5 +205,26 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") schedule(300); });
   if (configured) setTimeout(() => sync(), 300);
 
-  WP.cloud = { configured, status, signIn, signOut, sync, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
+  /* ---------- Schlüssel für Home Assistant ---------- */
+  // Eigener geheimer Schlüssel je Benutzer; damit legt Home Assistant über die Funktion wp_ingest Ablesungen an.
+  function newToken() {
+    const b = new Uint8Array(24); crypto.getRandomValues(b);
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function ingestKey(opts) {
+    const sess = await token();
+    let tok = null;
+    if (!(opts && opts.renew)) {
+      const rows = await http("/rest/v1/wp_ingest_tokens?select=token", { token: sess.access_token });
+      tok = Array.isArray(rows) && rows[0] ? rows[0].token : null;
+    }
+    if (!tok && opts && opts.create) {
+      tok = newToken();
+      await http("/rest/v1/wp_ingest_tokens?on_conflict=user_id", { method: "POST", token: sess.access_token,
+        body: [{ user_id: sess.user_id, token: tok }], headers: { Prefer: "resolution=merge-duplicates,return=minimal" } });
+    }
+    return tok ? { token: tok, url: URL_ + "/rest/v1/rpc/wp_ingest", apikey: KEY } : null;
+  }
+
+  WP.cloud = { configured, status, signIn, signOut, sync, ingestKey, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
 })();
